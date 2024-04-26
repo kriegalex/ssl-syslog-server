@@ -1,0 +1,11 @@
+{
+  "server_port": 60119,
+  "priority_colors": {
+      "error": "BRIGHT_RED",
+      "info": "BLUE",
+      "debug": "BRIGHT_BLACK"
+  },
+  "screen_output": false,
+  "file_max_size_kb": 1000,
+  "max_memory_size_kb": 100000
+}
