@@ -7,5 +7,5 @@
   },
   "screen_output": false,
   "file_max_size_kb": 1000,
-  "max_memory_size_kb": 100000
+  "max_memory_size_kb": 1000000
 }
