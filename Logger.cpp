@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <sstream>
 
-#include "SyslogBatcher.h"
 #include "ScreenLogger.h"
 #include "FileLogger.h"
 
