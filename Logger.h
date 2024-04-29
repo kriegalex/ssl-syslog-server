@@ -36,6 +36,5 @@ class Logger {
   std::string formatMessage() const;
   static std::string getAnsiColorCode(int colorCode);
   int getColorCode(int priorityDigit) const;
-  static std::string getFormattedFilename();
   void stopLoggers();
 };

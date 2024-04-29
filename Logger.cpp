@@ -9,7 +9,7 @@
 Logger::Logger(const Config &cfg) : screen_queue_(MemoryBoundedQueue<std::string>(cfg.getMaxMemorySizeKb() * 1024)),
                                     file_queue_(MemoryBoundedQueue<std::string>(cfg.getMaxMemorySizeKb() * 1024)),
                                     screen_logger_(screen_queue_),
-                                    file_logger_(file_queue_, getFormattedFilename(), cfg.getFileMaxSizeKb() * 1024),
+                                    file_logger_(file_queue_, cfg.getFileMaxSizeKb() * 1024),
                                     is_output_to_screen_(cfg.isOutputToScreen()) {
   priority_color_map_ = {
       {3, cfg.getErrorSeverityColorCode()},
@@ -99,23 +99,6 @@ std::string Logger::getAnsiColorCode(int colorCode) {
     case 15: return "\x1b[97m"; // Bright White
     default: return "\x1b[0m"; // Reset
   }
-}
-
-// Generate a filename based on the current date and time
-std::string Logger::getFormattedFilename() {
-  // Get current time as system_clock time_point
-  auto now = std::chrono::system_clock::now();
-  // Convert to time_t for compatibility with C time functions
-  auto now_c = std::chrono::system_clock::to_time_t(now);
-  // Convert to tm struct for use with put_time
-  struct tm now_tm{};
-  localtime_s(&now_tm, &now_c);
-
-  // Use ostringstream to format filename
-  std::ostringstream oss;
-  oss << std::put_time(&now_tm, "syslog_%Y_%m_%d_%H_%M_%S.txt");
-
-  return oss.str();
 }
 
 void Logger::stopLoggers() {

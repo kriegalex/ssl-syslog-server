@@ -6,8 +6,6 @@ SyslogServer *SyslogServer::instance_ = nullptr;
 
 SyslogServer::SyslogServer(const std::string &configPath) : config_(configPath),
                                                             logger_(config_),
-                                                            ssl_ctx_(nullptr),
-                                                            server_socket_(-1),
                                                             client_socket_(-1),
                                                             ssl_(nullptr) {
   instance_ = this;
@@ -24,6 +22,8 @@ SyslogServer::~SyslogServer() {
 }
 
 void SyslogServer::shutdownServer(int sig) {
+  if(sig != SIGINT) // unexpected
+    return;
   std::cout << "Shutdown signal received" << std::endl;
   if (instance_) {
     instance_->running_ = false;
@@ -58,6 +58,7 @@ void SyslogServer::run() {
             << " Syslog server running on port " << config_.getServerPort()
             << std::endl
             << std::endl;
+  running_ = true;
   acceptConnections();
 }
 

@@ -27,8 +27,8 @@ class SyslogServer {
   static SyslogServer *instance_;
   static void shutdownServer(int sig);
 
-  void setupSignals();
-  void enableVirtualTerminalProcessing();
+  static void setupSignals();
+  static void enableVirtualTerminalProcessing();
   void acceptConnections();
   void handleClient();
   void clientCleanup();
