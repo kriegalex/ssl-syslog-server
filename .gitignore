@@ -30,3 +30,12 @@
 *.exe
 *.out
 *.app
+
+# certificates
+*.pem
+
+# Bin
+bin/
+
+# cmake folders
+cmake-*/
