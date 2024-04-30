@@ -13,10 +13,8 @@ if (OPENSSL_FOUND)
 endif ()
 
 # Create an executable with this project's source files
-add_executable(${PROJECT_NAME} main.cpp
-        SyslogServer.cpp
+add_executable(${PROJECT_NAME} benchmark.cpp
         Config.cpp
-        SSLUtil.cpp
         Logger.cpp
         MemoryBoundedQueue.cpp)
 target_link_libraries(SecureSyslogServer OpenSSL::SSL OpenSSL::Crypto)
