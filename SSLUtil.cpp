@@ -2,7 +2,8 @@
 #include <stdexcept>
 #include <openssl/err.h>
 #ifdef OPENSSL_SYS_WINDOWS
-#include <winsock.h>
+#include <winsock2.h>
+#include <ip2string.h>
 #endif
 
 SSL_CTX *SSLUtil::createServerContext() {
@@ -69,6 +70,19 @@ int SSLUtil::createSocket(int port) {
   }
 
   return s;
+}
+
+std::string SSLUtil::getClientIP(int client_socket) {
+  struct sockaddr_in client_addr{};
+  int addr_len = sizeof(client_addr);
+
+  // Retrieve client information
+  if (getpeername(client_socket, (struct sockaddr *) &client_addr, &addr_len) == 0) {
+    char client_ip[16];
+    RtlIpv4AddressToStringA(&client_addr.sin_addr, client_ip);
+    return std::move(std::string(client_ip));
+  }
+  return std::move(std::string("Unknown"));
 }
 
 int SSLUtil::acceptClient(int serverSocket) {

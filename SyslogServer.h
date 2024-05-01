@@ -1,10 +1,8 @@
 #pragma once
 
-#include "Config.h"
-#include <string>
-#include <iostream>
 #include <openssl/ssl.h>
 
+#include "Config.h"
 #include "SSLUtil.h"
 #include "Logger.h"
 

@@ -1,4 +1,5 @@
 #include "SyslogServer.h"
+
 #include <csignal>
 
 // Initialize static instance pointer
@@ -22,7 +23,7 @@ SyslogServer::~SyslogServer() {
 }
 
 void SyslogServer::shutdownServer(int sig) {
-  if(sig != SIGINT) // unexpected
+  if (sig != SIGINT) // unexpected
     return;
   std::cout << "Shutdown signal received" << std::endl;
   if (instance_) {
@@ -65,6 +66,9 @@ void SyslogServer::run() {
 void SyslogServer::acceptConnections() {
   while (running_) {
     client_socket_ = SSLUtil::acceptClient(server_socket_);
+    std::string client_ip = SSLUtil::getClientIP(client_socket_);
+    // Now you have the client's IP
+    std::cout << "Client connected: " << client_ip << std::endl;
     ssl_ = SSLUtil::createSSL(ssl_ctx_, client_socket_);
     if (SSL_accept(ssl_) == 1) {
       handleClient();
