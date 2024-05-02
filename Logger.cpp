@@ -1,6 +1,5 @@
 #include "Logger.h"
 
-#include <filesystem>
 #include <sstream>
 
 #include "ScreenLogger.h"

@@ -4,12 +4,7 @@
 int main(int argc, char **argv) {
   try {
     SyslogServer server("config.json");
-    try {
-      server.run();
-    }
-    catch (const std::exception &e) {
-      server.cleanup();
-    }
+    server.run();
   }
   catch (const std::exception &e) {
     std::cerr << "Error: " << e.what() << std::endl;
