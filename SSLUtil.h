@@ -9,7 +9,9 @@ class SSLUtil {
   static SSL_CTX *createServerContext();
   static int createSocket(int port);
   static int acceptClient(int serverSocket);
-  static std::string getClientIP(int client_socket);
+  static void setupClient(int clientSocket);
+  static std::string getClientIP(int clientSocket);
+  static std::string sslErrorToString(int error);
   static SSL *createSSL(SSL_CTX *ctx, int clientSocket);
   static void initWinSocket();
   static void cleanWinSocket();

@@ -1,4 +1,6 @@
 #include "SSLUtil.h"
+
+#include <iostream>
 #include <stdexcept>
 #include <openssl/err.h>
 #ifdef OPENSSL_SYS_WINDOWS
@@ -46,7 +48,7 @@ int SSLUtil::createSocket(int port) {
     throw std::runtime_error("Unable to create socket.");
   }
 
-  sockaddr_in addr;
+  sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = INADDR_ANY;
@@ -55,10 +57,6 @@ int SSLUtil::createSocket(int port) {
   // Reuse the address; good for quick restarts
   if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (char *) &optval, sizeof(optval)) < 0) {
     throw std::runtime_error("Unable to set socket option SO_REUSEADDR.");
-  }
-  // Set TCP_NODELAY for syslog performance tuning
-  if (setsockopt(s, IPPROTO_TCP, TCP_NODELAY, (char *) &optval, sizeof(optval)) < 0) {
-    throw std::runtime_error("Unable to set socket option TCP_NODELAY.");
   }
 
   if (bind(s, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
@@ -72,12 +70,12 @@ int SSLUtil::createSocket(int port) {
   return s;
 }
 
-std::string SSLUtil::getClientIP(int client_socket) {
+std::string SSLUtil::getClientIP(int clientSocket) {
   struct sockaddr_in client_addr{};
   int addr_len = sizeof(client_addr);
 
   // Retrieve client information
-  if (getpeername(client_socket, (struct sockaddr *) &client_addr, &addr_len) == 0) {
+  if (getpeername(clientSocket, (struct sockaddr *) &client_addr, &addr_len) == 0) {
     char client_ip[16];
     RtlIpv4AddressToStringA(&client_addr.sin_addr, client_ip);
     return std::move(std::string(client_ip));
@@ -86,11 +84,12 @@ std::string SSLUtil::getClientIP(int client_socket) {
 }
 
 int SSLUtil::acceptClient(int serverSocket) {
-  sockaddr_in addr;
+  sockaddr_in addr{};
   int len = sizeof(addr);
   int client = accept(serverSocket, (struct sockaddr *) &addr, &len);
-  if (client < 0) {
-    throw std::runtime_error("Unable to accept client.");
+  if (client == INVALID_SOCKET) {
+    if (WSAGetLastError() != WSAEINTR) // the server was probably killed intentionally
+      throw std::runtime_error("Unable to accept client.");
   }
   return client;
 }
@@ -103,4 +102,16 @@ SSL *SSLUtil::createSSL(SSL_CTX *ctx, int clientSocket) {
   if (!SSL_set_fd(ssl, clientSocket))
     throw std::runtime_error("Unable to set the SSL file descriptor.");
   return ssl;
+}
+
+void SSLUtil::setupClient(int clientSocket) {
+  int timeout = 60000; // Timeout in milliseconds, 60 sec
+  if (setsockopt(clientSocket, SOL_SOCKET, SO_RCVTIMEO, (const char *) &timeout, sizeof(timeout)) < 0) {
+    throw std::runtime_error("Unable to set socket option SO_RCVTIMEO.");
+  }
+  int optval = 1;
+  // Set TCP_NODELAY for syslog performance tuning
+  if (setsockopt(clientSocket, IPPROTO_TCP, TCP_NODELAY, (char *) &optval, sizeof(optval)) < 0) {
+    throw std::runtime_error("Unable to set socket option TCP_NODELAY.");
+  }
 }
