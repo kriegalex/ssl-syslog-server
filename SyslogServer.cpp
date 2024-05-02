@@ -75,18 +75,26 @@ void SyslogServer::acceptConnections() {
       // use shared pointer
       auto thread = std::make_shared<SyslogServerThread>(ssl, client_socket, client_ip, logger_ptr_);
 
-      // use lambda to create a new thread and add it to the vector
-      threads_.emplace_back([thread]() {
-        thread->run();
-      });
+      { // save as weak_ptr to signal later without increasing ownership count
+        std::lock_guard<std::mutex> lock(shutdown_mutex_);
+        threads_.emplace_back(thread);
+      }
 
-      // Optionally, detach threads if you don't need to join them later
-      threads_.back().detach();
+      // use lambda to create a new thread and add it to the vector
+      std::thread([thread]() {
+        thread->run();
+      }).detach();
     }
   }
 }
 
 void SyslogServer::cleanup() {
+  std::lock_guard<std::mutex> lock(shutdown_mutex_);
+  for(const auto& weak_thread: threads_) {
+    if(auto thread = weak_thread.lock()) {
+      thread->clientCleanup();
+    }
+  }
   serverCleanup();
 }
 
@@ -111,15 +119,11 @@ void SyslogServerThread::handleClient() {
     buffer[rx_len] = '\0';
     logger_ptr_->processMessage(buffer);
   }
-  if(rx_len == 0) {
-    std::cout << "Client disconnected (clean): " << client_ip_ << std::endl;
-  } else {
+  if(rx_len != 0) { // 0 is clean disconnect
     int ssl_err = SSL_get_error(ssl_,rx_len);
     auto err_err = ERR_get_error();
     if(ssl_err == SSL_ERROR_SYSCALL) {
-      if(err_err == 0)
-        std::cout << "Client disconnected (dirty): " << client_ip_ << std::endl;
-      else
+      if(err_err != 0) // 0 is most probably an unexpected timeout/disconnect
         std::cerr << "Socket I/O error" << std::endl;
     } else {
       std::cerr << "SSL " << ERR_error_string(err_err, NULL) << std::endl;
@@ -134,6 +138,7 @@ void SyslogServerThread::clientCleanup() {
     ssl_ = nullptr;
   }
   if (client_socket_ != -1) {
+    std::cout << "Client disconnected: " << client_ip_ << std::endl;
     closesocket(client_socket_);
     client_socket_ = -1;
   }
