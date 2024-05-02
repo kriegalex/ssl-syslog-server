@@ -21,7 +21,7 @@ add_executable(${PROJECT_NAME} main.cpp
         MemoryBoundedQueue.cpp)
 target_link_libraries(SecureSyslogServer OpenSSL::SSL OpenSSL::Crypto)
 if (WIN32)
-    target_link_libraries(${PROJECT_NAME} ws2_32)
+    target_link_libraries(${PROJECT_NAME} ws2_32 ntdll)
 endif ()
 target_include_directories(SecureSyslogServer PRIVATE ${OPENSSL_INCLUDE_DIR})
 

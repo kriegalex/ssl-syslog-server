@@ -1,12 +1,28 @@
 #pragma once
 
-#include "Config.h"
-#include <string>
-#include <iostream>
 #include <openssl/ssl.h>
 
+#include "Config.h"
 #include "SSLUtil.h"
 #include "Logger.h"
+
+class SyslogServerThread {
+ public:
+  SyslogServerThread(SSL *ssl,
+                     int client_socket,
+                     std::string client_ip,
+                     std::shared_ptr<Logger> logger_ptr);
+  void run();
+  void clientCleanup();
+
+ private:
+  SSL *ssl_;
+  int client_socket_;
+  std::string client_ip_;
+  std::shared_ptr<Logger> logger_ptr_;
+
+  void handleClient();
+};
 
 class SyslogServer {
  public:
@@ -17,11 +33,11 @@ class SyslogServer {
 
  private:
   Config config_;
-  Logger logger_;
-  SSL_CTX *ssl_ctx_;
+  std::shared_ptr<Logger> logger_ptr_;
+  SSL_CTX *ssl_ctx_{};
   int server_socket_;
-  int client_socket_;
-  SSL *ssl_;
+  std::vector<std::weak_ptr<SyslogServerThread>> threads_;
+  std::mutex shutdown_mutex_;
   bool running_{};
 
   static SyslogServer *instance_;
@@ -30,7 +46,5 @@ class SyslogServer {
   static void setupSignals();
   static void enableVirtualTerminalProcessing();
   void acceptConnections();
-  void handleClient();
-  void clientCleanup();
   void serverCleanup();
 };
