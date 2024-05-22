@@ -86,7 +86,7 @@ class FileLogger {
     while (running_) {
       std::string log = queue_.pop();
       std::lock_guard<std::mutex> lock(mtx_);
-      file_stream_ << log << std::endl;
+      file_stream_ << log;
       checkAndRotateFile();
     }
     file_stream_.flush(); // in case wait_ is used and takes time
@@ -94,7 +94,7 @@ class FileLogger {
       while (!queue_.empty()) {
         std::string log = queue_.pop();
         std::lock_guard<std::mutex> lock(mtx_);
-        file_stream_ << log << std::endl;
+        file_stream_ << log;
         checkAndRotateFile();
       }
       file_stream_.flush();
