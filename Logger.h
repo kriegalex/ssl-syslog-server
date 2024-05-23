@@ -12,7 +12,9 @@ class Logger {
  public:
   explicit Logger(const Config &cfg);
   virtual ~Logger();
-  void processMessage(const char *input);
+  size_t processMessage(const char *input);
+  void startColorLine(int priority_digit);
+  void endLine();
   void stopWaitLoggers();
 
  private:
@@ -31,10 +33,7 @@ class Logger {
   std::unordered_map<int, int> priority_color_map_;
   bool is_output_to_screen_ = false;
 
-  int extractMessageLength() const;
-  int extractPriorityDigit() const;
-  std::string formatMessage() const;
   static std::string getAnsiColorCode(int colorCode);
-  int getColorCode(int priorityDigit) const;
+  int getColorCode(int priority_digit) const;
   void stopLoggers();
 };

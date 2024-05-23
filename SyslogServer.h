@@ -22,6 +22,7 @@ class SyslogServerThread {
   std::shared_ptr<Logger> logger_ptr_;
 
   void handleClient();
+  static int extractPriorityDigit(const char *input);
 };
 
 class SyslogServer {
