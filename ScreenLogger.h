@@ -18,12 +18,12 @@ class ScreenLogger {
   void run() {
     while (running_) {
       std::string log = queue_.pop();
-      std::cout << log << std::endl;
+      std::cout << log;
     }
     if(wait_) {
       while(!queue_.empty()) {
         std::string log = queue_.pop();
-        std::cout << log << std::endl;
+        std::cout << log;
       }
     }
   }

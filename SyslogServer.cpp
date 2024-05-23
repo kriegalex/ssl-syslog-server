@@ -112,12 +112,37 @@ SyslogServerThread::SyslogServerThread(SSL *ssl,
                                        std::shared_ptr<Logger> logger_ptr)
     : ssl_(ssl), client_socket_(client_socket), client_ip_(std::move(client_ip)), logger_ptr_(std::move(logger_ptr)) {}
 
+
+int SyslogServerThread::extractPriorityDigit(const char* input) {
+  std::string message(input);
+  size_t start = message.find('<') + 1;
+  size_t end = message.find('>');
+  return std::stoi(message.substr(start, end - start)) % 8;
+}
+
 void SyslogServerThread::handleClient() {
-  char buffer[20 * 1024] = {0};
+  char buffer[16 * 1024] = {0};
   int rx_len;
+  size_t message_length;
+  size_t processed_size = 0;
+  // process the message length metadata
   while ((rx_len = SSL_read(ssl_, buffer, static_cast<int>(sizeof(buffer) - 1))) > 0) {
     buffer[rx_len] = '\0';
-    logger_ptr_->processMessage(buffer);
+    size_t data_start_index = 0;
+    if(processed_size == 0) {
+      // the real payload starts after the space
+      data_start_index = std::string(buffer).find(' ') + 1;
+      // -1 removes the space
+      std::string message_length_str = std::string(buffer).substr(0,data_start_index-1);
+      message_length = std::stoi(message_length_str);
+      int priorityDigit = extractPriorityDigit(buffer);
+      logger_ptr_->startColorLine(priorityDigit);
+    }
+    processed_size += logger_ptr_->processMessage(buffer+data_start_index);
+    if(processed_size >= message_length) {
+      logger_ptr_->endLine(); // SSL_read has finished consuming the message
+      processed_size = 0;
+    }
   }
   if(rx_len != 0) { // 0 is clean disconnect
     int ssl_err = SSL_get_error(ssl_,rx_len);

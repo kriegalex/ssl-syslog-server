@@ -29,53 +29,37 @@ Logger::~Logger() {
   }
 }
 
-void Logger::processMessage(const char *input) {
+size_t Logger::processMessage(const char *input) {
   message_ = std::string(input);
-  int length = extractMessageLength();
-  if (length != (message_.length() - message_.find(' '))) {
-    std::cerr << "Error: Message length does not match the expected length!" << std::endl;
-    return;
-  }
 
-  int priorityDigit = extractPriorityDigit();
-  int colorCode = getColorCode(priorityDigit);
-  if (colorCode == 0) {
-    std::cerr << "Unsupported priority digit for color mapping." << std::endl;
-    return;
-  }
-
-  std::string formattedMessage = formatMessage();
-  file_queue_.push(formattedMessage);
-  std::string ansiColor = getAnsiColorCode(colorCode); // Assume this function is defined elsewhere
+  file_queue_.push(message_);
   // prefix with color and append with reset color
-  const std::string screenStr = ansiColor + formattedMessage + std::string("\x1b[0m");
+  const std::string screenStr = message_;
   if (is_output_to_screen_) {
     screen_queue_.push(screenStr);
   }
+  return message_.length(); // return the processed size
 }
 
-int Logger::extractMessageLength() const {
-  size_t firstSpaceIndex = message_.find(' ');
-  return std::stoi(message_.substr(0, firstSpaceIndex));
+void Logger::startColorLine(int priority_digit) {
+  if (is_output_to_screen_) {
+    screen_queue_.push(getAnsiColorCode(getColorCode(priority_digit)));
+  }
 }
 
-int Logger::extractPriorityDigit() const {
-  size_t start = message_.find('<') + 1;
-  size_t end = message_.find('>');
-  return std::stoi(message_.substr(start, end - start)) % 8;
+void Logger::endLine() {
+  file_queue_.push("\n");
+  if (is_output_to_screen_) {
+    screen_queue_.push("\x1b[0m\n");
+  }
 }
 
-int Logger::getColorCode(int priorityDigit) const {
-  auto it = priority_color_map_.find(priorityDigit);
+int Logger::getColorCode(int priority_digit) const {
+  auto it = priority_color_map_.find(priority_digit);
   if (it != priority_color_map_.end()) {
     return it->second;
   }
-  return 0; // Return 0 if not found to signify unsupported priority
-}
-
-std::string Logger::formatMessage() const {
-  size_t firstSpaceIndex = message_.find(' ');
-  return message_.substr(firstSpaceIndex + 1);
+  return 1000; // Return 1000 if not found to signify unsupported priority
 }
 
 std::string Logger::getAnsiColorCode(int colorCode) {
