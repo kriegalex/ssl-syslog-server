@@ -2,7 +2,10 @@
 
 #include <csignal>
 #include <utility>
+#include <string>
 #include <openssl/err.h>
+
+using namespace std::string_literals;
 
 // Initialize static instance pointer
 SyslogServer *SyslogServer::instance_ = nullptr;
@@ -66,7 +69,7 @@ void SyslogServer::run() {
 void SyslogServer::acceptConnections() {
   while (instance_->running_) {
     int client_socket = SSLUtil::acceptClient(server_socket_);
-    if(client_socket != INVALID_SOCKET) {
+    if (client_socket != INVALID_SOCKET) {
       SSLUtil::setupClient(client_socket);
 
       std::string client_ip = SSLUtil::getClientIP(client_socket);
@@ -90,8 +93,8 @@ void SyslogServer::acceptConnections() {
 
 void SyslogServer::cleanup() {
   std::lock_guard<std::mutex> lock(shutdown_mutex_);
-  for(const auto& weak_thread: threads_) {
-    if(auto thread = weak_thread.lock()) {
+  for (const auto &weak_thread : threads_) {
+    if (auto thread = weak_thread.lock()) {
       thread->clientCleanup();
     }
   }
@@ -112,12 +115,64 @@ SyslogServerThread::SyslogServerThread(SSL *ssl,
                                        std::shared_ptr<Logger> logger_ptr)
     : ssl_(ssl), client_socket_(client_socket), client_ip_(std::move(client_ip)), logger_ptr_(std::move(logger_ptr)) {}
 
-
-int SyslogServerThread::extractPriorityDigit(const char* input) {
-  std::string message(input);
+int SyslogServerThread::extractPriorityDigit(const std::string &message) {
   size_t start = message.find('<') + 1;
   size_t end = message.find('>');
   return std::stoi(message.substr(start, end - start)) % 8;
+}
+
+// Function to remove BOM
+std::string SyslogServerThread::removeBOM(const std::string &data) {
+  const std::string BOM_UTF8 = "\xEF\xBB\xBF"s;
+  const std::string BOM_UTF16_BE = "\xFE\xFF"s;
+  const std::string BOM_UTF16_LE = "\xFF\xFE"s;
+  const std::string BOM_UTF32_BE = "\x00\x00\xFE\xFF"s;
+  const std::string BOM_UTF32_LE = "\xFF\xFE\x00\x00"s;
+
+  if (data.compare(0, BOM_UTF8.size(), BOM_UTF8) == 0) {
+    return data.substr(BOM_UTF8.size());
+  } else if (data.compare(0, BOM_UTF16_BE.size(), BOM_UTF16_BE) == 0 ||
+      data.compare(0, BOM_UTF16_LE.size(), BOM_UTF16_LE) == 0) {
+    return data.substr(2);
+  } else if (data.compare(0, BOM_UTF32_BE.size(), BOM_UTF32_BE) == 0 ||
+      data.compare(0, BOM_UTF32_LE.size(), BOM_UTF32_LE) == 0) {
+    return data.substr(4);
+  }
+  return data;
+}
+
+// Function to ensure the message is in UTF-8 encoding
+std::string SyslogServerThread::normalizeToUTF8(const std::string &message) {
+  // UTF-16 and UTF-32 not supported for now
+  if (message.size() >= 2 && message[0] != '\xEF') {
+    return "Unsupported UTF-16/32 encoding";
+  }
+  // Remove BOM if present
+  std::string cleaned_message = removeBOM(message);
+
+  return std::move(cleaned_message); // Assuming message is already in UTF-8 if no BOM or UTF-16 detected
+}
+
+std::string SyslogServerThread::parseSyslogMsg(const char *msg) {
+  const std::string input = std::string(msg);
+  std::istringstream stream(input);
+  std::string message_content;
+
+  // Example syslog message format: "<34>1 2020-12-31T23:59:59Z mymachine app 1234 - [exampleSDID@32473 iut=\"3\" eventSource=\"Application\" eventID=\"1011\"] BOM and message content"
+
+  stream >> priority_ >> timestamp_ >> hostname_ >> app_name_ >> process_id_ >> message_id_ >> hyphen_;
+
+  // Remaining part of the line is the message content
+  std::getline(stream, message_content);
+  if (!message_content.empty() && message_content[0] == ' ') {
+    message_content = message_content.substr(1);
+  }
+
+  // Normalize message content to UTF-8 and remove BOM
+  std::string normalized_msg = normalizeToUTF8(message_content);
+  bom_size_ = message_content.size() - normalized_msg.size();
+
+  return std::move(normalized_msg);
 }
 
 void SyslogServerThread::handleClient() {
@@ -128,27 +183,39 @@ void SyslogServerThread::handleClient() {
   // process the message length metadata
   while ((rx_len = SSL_read(ssl_, buffer, static_cast<int>(sizeof(buffer) - 1))) > 0) {
     buffer[rx_len] = '\0';
-    size_t data_start_index = 0;
-    if(processed_size == 0) {
+    if (processed_size == 0) {
       // the real payload starts after the space
-      data_start_index = std::string(buffer).find(' ') + 1;
+      size_t data_start_index = std::string(buffer).find(' ') + 1;
       // -1 removes the space
-      std::string message_length_str = std::string(buffer).substr(0,data_start_index-1);
+      std::string message_length_str = std::string(buffer).substr(0, data_start_index - 1);
       message_length = std::stoi(message_length_str);
-      int priorityDigit = extractPriorityDigit(buffer);
+      std::string message_content = parseSyslogMsg(buffer + data_start_index);
+      // add the removed bom size
+      processed_size += bom_size_;
+      int priorityDigit = extractPriorityDigit(priority_);
       logger_ptr_->startColorLine(priorityDigit);
+      processed_size += logger_ptr_->processMessage(
+          priority_ + std::string(" ") +
+          timestamp_ + std::string(" ") +
+          hostname_ + std::string(" ") +
+          app_name_ + std::string(" ") +
+          process_id_ + std::string(" ") +
+          message_id_ + std::string(" ") +
+          hyphen_ + std::string(" "));
+      processed_size += logger_ptr_->processMessage(message_content);
+    } else {
+      processed_size += logger_ptr_->processMessage(std::string(buffer));
     }
-    processed_size += logger_ptr_->processMessage(buffer+data_start_index);
-    if(processed_size >= message_length) {
+    if (processed_size >= message_length) {
       logger_ptr_->endLine(); // SSL_read has finished consuming the message
       processed_size = 0;
     }
   }
-  if(rx_len != 0) { // 0 is clean disconnect
-    int ssl_err = SSL_get_error(ssl_,rx_len);
+  if (rx_len != 0) { // 0 is clean disconnect
+    int ssl_err = SSL_get_error(ssl_, rx_len);
     auto err_err = ERR_get_error();
-    if(ssl_err == SSL_ERROR_SYSCALL) {
-      if(err_err != 0) // 0 is most probably an unexpected timeout/disconnect
+    if (ssl_err == SSL_ERROR_SYSCALL) {
+      if (err_err != 0) // 0 is most probably an unexpected timeout/disconnect
         std::cerr << "Socket I/O error" << std::endl;
     } else {
       std::cerr << "SSL " << ERR_error_string(err_err, NULL) << std::endl;

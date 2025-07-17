@@ -60,6 +60,7 @@ int SSLUtil::createSocket(int port) {
   }
 
   if (bind(s, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+    std::cerr << "Error: " << WSAGetLastError() << std::endl;
     throw std::runtime_error("Unable to bind to socket.");
   }
 

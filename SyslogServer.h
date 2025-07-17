@@ -21,8 +21,15 @@ class SyslogServerThread {
   std::string client_ip_;
   std::shared_ptr<Logger> logger_ptr_;
 
+  // related to parsing syslog
+  std::string priority_, timestamp_, hostname_, app_name_, process_id_, message_id_, hyphen_;
+  unsigned short bom_size_;
+
   void handleClient();
-  static int extractPriorityDigit(const char *input);
+  static int extractPriorityDigit(const std::string &message);
+  std::string parseSyslogMsg(const char *msg);
+  static std::string removeBOM(const std::string &data);
+  static std::string normalizeToUTF8(const std::string &message);
 };
 
 class SyslogServer {

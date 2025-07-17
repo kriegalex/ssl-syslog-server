@@ -29,16 +29,13 @@ Logger::~Logger() {
   }
 }
 
-size_t Logger::processMessage(const char *input) {
-  message_ = std::string(input);
+size_t Logger::processMessage(const std::string &message) {
 
-  file_queue_.push(message_);
-  // prefix with color and append with reset color
-  const std::string screenStr = message_;
+  file_queue_.push(message);
   if (is_output_to_screen_) {
-    screen_queue_.push(screenStr);
+    screen_queue_.push(message);
   }
-  return message_.length(); // return the processed size
+  return message.length(); // return the processed size
 }
 
 void Logger::startColorLine(int priority_digit) {

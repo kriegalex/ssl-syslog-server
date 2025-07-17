@@ -12,7 +12,7 @@ class Logger {
  public:
   explicit Logger(const Config &cfg);
   virtual ~Logger();
-  size_t processMessage(const char *input);
+  size_t processMessage(const std::string &input);
   void startColorLine(int priority_digit);
   void endLine();
   void stopWaitLoggers();
@@ -25,7 +25,6 @@ class Logger {
   FileLogger file_logger_;
   std::thread screen_thread_;
   std::thread file_thread_;
-  std::string message_;
   /*
    * the key is an int and represents the severity level encoded in the syslog message
    * <166> -> level 6 (facility*8+severity)
